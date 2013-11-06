@@ -1,7 +1,8 @@
 import xmlrpclib
 import sys
+import datetime
 from Bicho.backends import Backend
-from Bicho.common import Issue, Tracker
+from Bicho.common import Issue, Tracker, People
 from Bicho.utils import printdbg, printerr, printout
 from Bicho.db.database import DBIssue, DBBackend, get_database, NotFoundError
 from storm.locals import Int, Reference
@@ -26,7 +27,7 @@ class DBTracIssueExt(object):
     issue = Reference(issue_id, DBIssue.id)
 
     def __init__(self, issue_id):
-        self.issue_id = issue.id
+        self.issue_id = issue_id
 
 class DBTracIssueExtMySQL(DBTracIssueExt):
     """
@@ -93,7 +94,7 @@ class TracBackend(Backend):
         printdbg("analyzing a new bug")
         bugid = bug[0][0]
         bugsummary = bug[0][3]['summary']
-        issue = Issue(bugid, None, bugsummary, None, None, None)
+        issue = Issue(bugid, None, bugsummary, None, People(1), datetime.datetime.today())
         return issue
 
     def run(self):       
@@ -120,22 +121,22 @@ class TracBackend(Backend):
         for bug in bugs.results:
             try:
                 issue_data = self.analyze_bug(bug)
+                printout("Analyzing bug # %s" % bug[0][0])
             except Exception:
                 printerr("Error in function analyze_bug with Bug: %s" % bug[0])
                 raise
 
-            try:
-                bugsdb.insert_issue(issue_data, dbtrk.id)
-            except UnicodeEncodeError:
-                printerr("UnicodeEncodeError: the issue %s couldn't be stored"
-                      % (issue_data.issue))
-            except NotFoundError:
-                printerr("NotFoundError: the issue %s couldn't be stored"
-                         % (issue_data.issue))
-            except Exception, e:
-                printerr("Unexpected Error: the issue %s couldn't be stored"
-                         % (issue_data.issue))
-                print e
+            bugsdb.insert_issue(issue_data, dbtrk.id)
+            # except UnicodeEncodeError:
+            #     printerr("UnicodeEncodeError: the issue %s couldn't be stored"
+            #           % (issue_data.issue))
+            # except NotFoundError:
+            #     printerr("NotFoundError: the issue %s couldn't be stored"
+            #              % (issue_data.issue))
+            # except Exception, e:
+            #     printerr("Unexpected Error: the issue %s couldn't be stored"
+            #              % (issue_data.issue))
+            #     print e
             
 
         try:
