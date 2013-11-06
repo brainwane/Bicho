@@ -7,36 +7,17 @@ from Bicho.db.database import DBBackend
 
 # grabbing bug ID & "title" a.k.a. "summary"
 
-# class TracIssue(Issue):
-
-
 rpc_url = "https://brainwane:for-api-access@code.djangoproject.com/login/rpc"
 trac = xmlrpclib.ServerProxy(rpc_url)
-
 notclosed = trac.ticket.query("status!=closed")
 chunkoftix = notclosed[60:70]
 
 multicall = xmlrpclib.MultiCall(trac)
 
-for x in chunkoftix:
-    multicall.ticket.get(x)
-result = multicall()
-
-for ticket in result:
-    twr.append({"id":ticket[0],
-                "summary":ticket[3]["summary"]
-                # "status":ticket[3]["status"],
-                # "reported":ticket[1]
-                })
-
-
-# next: get them into the database
-
-
 class TracBackend(Backend):
 
     def analyze_bug(self, bug):
-        # this is where we take each bug in the collection returned by the API call and append each bug attribute onto a unique Issue object
+        """Take each bug in the collection returned by the API call and append each bug attribute onto a unique Issue object."""
         printdbg("analyzing a new bug")
         bugid = bug[0]
         bugsummary = bug[3]['summary']
@@ -49,8 +30,14 @@ class TracBackend(Backend):
         bugsdb = get_database(DBBackend())
         printdbg(rpc_url)
 
-#        bugs = multicall on the Trac API
+        for x in chunkoftix:
+            multicall.ticket.get(x)
+        bugs = multicall()
+
         bugsdb.insert_supported_traker("trac", "x.x")
+        trk = Tracker(rpc_url, "trac", "x.x")
+        dbtrk = bugsdb.insert_tracker(trk)
+
         nbugs = len(bugs)
         if nbugs == 0:
             printout("No bugs found. Did you provide the correct URL?")
@@ -64,6 +51,20 @@ class TracBackend(Backend):
             except Exception:
                 printerr("Error in function analyze_bug with Bug: %s" % bug[0])
                 raise
+
+            try:
+                bugsdb.insert_issue(issue_data, dbtrk.id)
+            except UnicodeEncodeError:
+                printerr("UnicodeEncodeError: the issue %s couldn't be stored"
+                      % (issue_data.issue))
+            except NotFoundError:
+                printerr("NotFoundError: the issue %s couldn't be stored"
+                         % (issue_data.issue))
+            except Exception, e:
+                printerr("Unexpected Error: the issue %s couldn't be stored"
+                         % (issue_data.issue))
+                print e
+            
 
         try:
             # we read the temporary table with the relationships and create
