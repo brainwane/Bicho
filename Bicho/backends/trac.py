@@ -3,7 +3,8 @@ import sys
 from Bicho.backends import Backend
 from Bicho.common import Issue
 from Bicho.utils import printdbg, printerr, printout
-from Bicho.db.database import DBBackend
+from Bicho.db.database import DBIssue, DBBackend, get_database
+from storm.locals import Int, Reference
 
 # grabbing bug ID & "title" a.k.a. "summary"
 
@@ -13,6 +14,77 @@ notclosed = trac.ticket.query("status!=closed")
 chunkoftix = notclosed[60:70]
 
 multicall = xmlrpclib.MultiCall(trac)
+
+class DBTracIssueExt(object):
+    """
+    Types for each field.
+    """
+    __storm_table__ = 'issues_ext_trac'
+
+    id = Int(primary=True)
+    issue_id = Int()
+    issue = Reference(issue_id, DBIssue.id)
+
+    def __init__(self, issue_id):
+        self.issue_id = issue.id
+
+class DBTracIssueExtMySQL(DBTracIssueExt):
+    """
+    MySQL subclass of L{DBTracIssueExt}
+    """
+    __sql_table__ = 'CREATE TABLE IF NOT EXISTS issues_ext_trac (\
+                     id INTEGER NOT NULL AUTO_INCREMENT, \
+                     issue_id INTEGER NOT NULL, \
+                     PRIMARY KEY(id), \
+                     UNIQUE KEY(issue_id), \
+                     INDEX ext_issue_idx(issue_id), \
+                     FOREIGN KEY(issue_id) \
+                       REFERENCES issues(id) \
+                         ON DELETE CASCADE \
+                         ON UPDATE CASCADE \
+                     ) ENGINE=MYISAM; '
+
+class DBTracBackend(DBBackend):
+    """
+    Adapter for Trac backend, to make it so there is a MYSQL_EXT.
+    """
+    def __init__(self):
+        self.MYSQL_EXT = [DBTracIssueExtMySQL]
+
+    def insert_issue_ext(self, store, issue, issue_id):
+        """
+        Insert the given extra parameters of issue with id X{issue_id}.
+
+        @param store: database connection
+        @type store: L{storm.locals.Store}
+        @param issue: issue to insert
+        @type issue: L{TracIssue}
+        @param issue_id: identifier of the issue
+        @type issue_id: C{int}
+
+        @return: the inserted extra parameters issue
+        @rtype: L{DBTracIssueExt}
+        """
+
+        newIssue = False
+
+        try:
+            db_issue_ext = store.find(DBTracIssueExt,
+                                      DBTracIssueExt.issue_id
+                                      ==
+                                      issue_id).one()
+            if not db_issue_ext:
+                newIssue = True
+                db_issue_ext = DBTracIssueExt(issue_id)
+
+            if newIssue == True:
+                store.add(db_issue_ext)
+
+            store.flush()
+            return db_issue_ext
+        except:
+            store.rollback()
+            raise
 
 class TracBackend(Backend):
 
