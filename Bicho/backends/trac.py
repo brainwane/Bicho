@@ -1,9 +1,9 @@
 import xmlrpclib
 import sys
 from Bicho.backends import Backend
-from Bicho.common import Issue
+from Bicho.common import Issue, Tracker
 from Bicho.utils import printdbg, printerr, printout
-from Bicho.db.database import DBIssue, DBBackend, get_database
+from Bicho.db.database import DBIssue, DBBackend, get_database, NotFoundError
 from storm.locals import Int, Reference
 
 # grabbing bug ID & "title" a.k.a. "summary"
@@ -91,15 +91,15 @@ class TracBackend(Backend):
     def analyze_bug(self, bug):
         """Take each bug in the collection returned by the API call and append each bug attribute onto a unique Issue object."""
         printdbg("analyzing a new bug")
-        bugid = bug[0]
-        bugsummary = bug[3]['summary']
+        bugid = bug[0][0]
+        bugsummary = bug[0][3]['summary']
         issue = Issue(bugid, None, bugsummary, None, None, None)
         return issue
 
     def run(self):       
         print("Running Bicho")
 
-        bugsdb = get_database(DBBackend())
+        bugsdb = get_database(DBTracBackend())
         printdbg(rpc_url)
 
         for x in chunkoftix:
@@ -110,14 +110,14 @@ class TracBackend(Backend):
         trk = Tracker(rpc_url, "trac", "x.x")
         dbtrk = bugsdb.insert_tracker(trk)
 
-        nbugs = len(bugs)
+        nbugs = len(bugs.results)
         if nbugs == 0:
             printout("No bugs found. Did you provide the correct URL?")
             sys.exit(0)
 
         analyzed = []
 
-        for bug in bugs:
+        for bug in bugs.results:
             try:
                 issue_data = self.analyze_bug(bug)
             except Exception:
