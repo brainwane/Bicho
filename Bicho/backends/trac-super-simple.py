@@ -75,4 +75,4 @@ class TracBackend(Backend):
 
         printout("Done. %s bugs analyzed" % (nbugs))
 
-Backend.register_backend("trac", Trac)
+Backend.register_backend("trac", Backend)
