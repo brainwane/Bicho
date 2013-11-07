@@ -9,7 +9,7 @@ from storm.locals import Int, Reference
 
 # grabbing bug ID & "title" a.k.a. "summary"
 
-rpc_url = "https://brainwane:for-api-access@code.djangoproject.com/login/rpc"
+rpc_url = "https://brainwane:for-api-access@code.djangoproject.com/login/rpc" # This will no longer work because I have now changed my password. :)
 trac = xmlrpclib.ServerProxy(rpc_url)
 notclosed = trac.ticket.query("status!=closed")
 chunkoftix = notclosed[60:70]
