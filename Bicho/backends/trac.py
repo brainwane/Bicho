@@ -1,6 +1,7 @@
 import xmlrpclib
 import sys
 import datetime
+from Bicho.Config import Config
 from Bicho.backends import Backend
 from Bicho.common import Issue, Tracker, People
 from Bicho.utils import printdbg, printerr, printout
@@ -8,13 +9,6 @@ from Bicho.db.database import DBIssue, DBBackend, get_database, NotFoundError
 from storm.locals import Int, Reference
 
 # grabbing bug ID & "title" a.k.a. "summary"
-
-rpc_url = "https://brainwane:for-api-access@code.djangoproject.com/login/rpc" # This will no longer work because I have now changed my password. :)
-trac = xmlrpclib.ServerProxy(rpc_url)
-notclosed = trac.ticket.query("status!=closed")
-chunkoftix = notclosed[60:70]
-
-multicall = xmlrpclib.MultiCall(trac)
 
 class DBTracIssueExt(object):
     """
@@ -89,6 +83,9 @@ class DBTracBackend(DBBackend):
 
 class TracBackend(Backend):
 
+    def __init__(self):
+        self.url = Config.url
+
     def analyze_bug(self, bug):
         """Take each bug in the collection returned by the API call and append each bug attribute onto a unique Issue object."""
         printdbg("analyzing a new bug")
@@ -101,14 +98,19 @@ class TracBackend(Backend):
         print("Running Bicho")
 
         bugsdb = get_database(DBTracBackend())
-        printdbg(rpc_url)
+        printdbg(self.url)
+
+        trac = xmlrpclib.ServerProxy(self.url)
+        multicall = xmlrpclib.MultiCall(trac)
+        notclosed = trac.ticket.query("status!=closed")
+        chunkoftix = notclosed[60:70]
 
         for x in chunkoftix:
             multicall.ticket.get(x)
         bugs = multicall()
 
         bugsdb.insert_supported_traker("trac", "x.x")
-        trk = Tracker(rpc_url, "trac", "x.x")
+        trk = Tracker(self.url, "trac", "x.x")
         dbtrk = bugsdb.insert_tracker(trk)
 
         nbugs = len(bugs.results)
